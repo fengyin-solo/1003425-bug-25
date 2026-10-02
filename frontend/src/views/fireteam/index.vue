@@ -38,6 +38,7 @@
         <tr>
           <th v-for="column in columns" :key="column">{{ column }}</th>
           <th>当前状态</th>
+          <th>异常归属</th>
           <th>可执行动作</th>
         </tr>
       </thead>
@@ -45,6 +46,7 @@
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
+          <td>{{ row.abnormal ? row.异常归属 ?? row['所属林场'] ?? '—' : '—' }}</td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -58,7 +60,7 @@
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无扑火队伍数据，可先登记扑火队伍</td>
+          <td :colspan="columns.length + 3" class="empty-state">暂无扑火队伍数据，可先登记扑火队伍</td>
         </tr>
       </tbody>
     </table>
@@ -85,13 +87,18 @@ const meta = moduleMeta('fireteam')
 const columns = ["队伍编号", "队伍名称", "所属林场", "队长姓名", "队员人数", "集结半径", "值班状态", "出动状态"]
 const actions = ["下达出动", "转入休整", "撤回队伍"]
 const statuses = ["在营待命", "已出动", "扑救中", "已撤回", "休整中"]
-const stats = [{"label": "队伍总数", "value": 0}, {"label": "待命队伍", "value": 0}, {"label": "出动队伍", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+// 值班工作台卡片跟着列表数据走：撤回、休整落库后待命/出动数量立即对齐，不再错位。
+const stats = computed(() => [
+  { label: '队伍总数', value: total.value },
+  { label: '待命队伍', value: rows.value.filter((row) => row.status === '在营待命').length },
+  { label: '出动队伍', value: rows.value.filter((row) => row.status === '已出动' || row.status === '扑救中').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,

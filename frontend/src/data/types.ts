@@ -18,6 +18,8 @@ export type ModuleMeta = {
   actions: string[]
   actionTargets: Record<string, string>
   metrics: string[]
+  // 异常归属字段：登记后，记录首次转异常时会把该字段的值盖章到「异常归属」，之后不再改写
+  ownerField?: string
 }
 
 export type PageResult = {
@@ -35,4 +37,6 @@ export type ActionResult = {
 export type OverviewResult = {
   cards: { label: string; value: number }[]
   modules: { name: string; created: number; pending: number; abnormal: number }[]
+  // 异常归属汇总：按模块登记的归属字段分组，归属以首次落库的盖章为准
+  exceptions: { module: string; owner: string; count: number }[]
 }

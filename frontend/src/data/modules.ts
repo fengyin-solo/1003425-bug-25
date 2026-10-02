@@ -56,6 +56,7 @@ export const MODULES: ModuleMeta[] = [
     actions: ["下达出动", "转入休整", "撤回队伍"],
     actionTargets: {"下达出动": "已出动", "转入休整": "休整中", "撤回队伍": "已撤回"},
     metrics: ["队伍总数", "待命队伍", "出动队伍"],
+    ownerField: "所属林场",
   },
   {
     key: "equipment",

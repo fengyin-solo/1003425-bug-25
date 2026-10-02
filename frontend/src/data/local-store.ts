@@ -40,12 +40,19 @@ export function listRows(key: string): EntryRow[] {
   return allRows()[key] ?? []
 }
 
-export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
+// 原子保存：先整体序列化、先写 localStorage，全部成功后才替换内存缓存。
+// 任何一步抛错，缓存都保持原样——页面、工作台、待办读的都是缓存，相当于整体回退。
+export function saveModules(entries: Record<string, EntryRow[]>): void {
+  const next = { ...allRows(), ...entries }
+  const payload = JSON.stringify(next)
   if (typeof window !== 'undefined' && window.localStorage) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    window.localStorage.setItem(STORAGE_KEY, payload)
   }
+  cache = next
+}
+
+export function saveRows(key: string, rows: EntryRow[]): void {
+  saveModules({ [key]: rows })
 }
 
 export function resetRows(key: string): EntryRow[] {
