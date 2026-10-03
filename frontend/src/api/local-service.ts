@@ -1,9 +1,13 @@
 import { MODULE_BY_KEY } from '@/data/modules'
-import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
+import { allRows, listRows, resetRows, saveModules, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
 const NEGATIVE_ACTIONS = ['撤销', '作废', '拒绝', '驳回', '停用', '忽略', '下线', '回滚']
+
+// 扑火队伍撤回收尾时，要同步登记的值班处置台账所在模块（另一个入口：值勤排班页）。
+const DUTY_LEDGER_MODULE = 'duty'
+const WITHDRAW_ACTION = '撤回队伍'
 
 export function moduleMeta(key: string): ModuleMeta {
   const meta = MODULE_BY_KEY.get(key)
@@ -43,17 +47,57 @@ export function runAction(key: string, id: number, action: string): ActionResult
   if (current === target) {
     return { ok: false, message: `${meta.entity}已经是「${target}」，不用重复操作` }
   }
-  const lastStatus = meta.statuses[meta.statuses.length - 1]
+  const closedStatuses = meta.closedStatuses ?? [meta.statuses[meta.statuses.length - 1]]
   const updated: EntryRow = {
     ...rows[index],
     status: target,
-    pending: target !== lastStatus,
-    abnormal: NEGATIVE_ACTIONS.some((verb) => action.startsWith(verb)),
+    pending: !closedStatuses.includes(target),
+    // 异常归属一旦落库就不再被后续动作抹掉：调岗、撤回、休整都只认先落库的状态，
+    // 负向动作则继续把记录标成异常。
+    abnormal:
+      Boolean(rows[index].abnormal) || NEGATIVE_ACTIONS.some((verb) => action.startsWith(verb)),
   }
   const next = [...rows]
   next[index] = updated
-  saveRows(key, next)
+  try {
+    if (key === 'fireteam' && action === WITHDRAW_ACTION) {
+      // 撤回收尾：队伍状态与值班处置台账一次原子落库，要么都成、要么都回退。
+      // 再次出动不写台账，重复撤回被上面的状态守卫拦下，所以一次收尾只落一条。
+      const ledgerRows = listRows(DUTY_LEDGER_MODULE)
+      const ledger = buildWithdrawalLedger(updated, ledgerRows)
+      saveModules({ [key]: next, [DUTY_LEDGER_MODULE]: [...ledgerRows, ledger] })
+    } else {
+      saveRows(key, next)
+    }
+  } catch {
+    return {
+      ok: false,
+      message: `${meta.entity}${action}保存失败，收尾页面、工作台和待办已回退到操作前状态`,
+    }
+  }
   return { ok: true, message: `${meta.entity}已${action}，当前状态「${target}」` }
+}
+
+// 撤回收尾台账：异常归属随台账保留，所属林场按落库时的快照记，调岗后仍归原所属林场。
+function buildWithdrawalLedger(team: EntryRow, ledgerRows: EntryRow[]): EntryRow {
+  const id = ledgerRows.reduce((max, row) => Math.max(max, Number(row.id) || 0), 0) + 1
+  const now = new Date()
+  const hour = now.getHours()
+  const shift = hour >= 8 && hour < 20 ? '白班 08:00-20:00' : '夜班 20:00-08:00'
+  return {
+    id,
+    status: '待确认',
+    pending: true,
+    abnormal: Boolean(team.abnormal),
+    排班编号: `DUTY-${String(id).padStart(4, '0')}`,
+    值勤日期: now.toISOString().slice(0, 10),
+    值勤时段: shift,
+    值勤岗位: '扑火队伍撤回处置',
+    值勤人员: String(team['队长姓名'] ?? ''),
+    接班人员: '待安排',
+    交接记录: `${String(team['队伍名称'] ?? '')}（${String(team['队伍编号'] ?? '')}）撤回收尾，异常归属：${String(team['所属林场'] ?? '')}`,
+    排班状态: '待确认',
+  }
 }
 
 export function resetModule(key: string): PageResult {

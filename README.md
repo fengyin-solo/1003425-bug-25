@@ -66,6 +66,9 @@ npm run build
 - 每个模块的页面在 `frontend/src/views/<模块>/index.vue`，页面只负责渲染，读写统一走
   `frontend/src/api/local-service.ts`。
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
-  `frontend/src/data/seed.ts`。
-- 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
+  `frontend/src/data/seed.ts`。`closedStatuses` 登记收尾（终态）状态，落到这些状态不再计入待办。
+- 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。异常标记一旦落库就不再被
+  后续动作抹掉（调岗、撤回都只认先落库的状态）。
+- 扑火队伍「撤回队伍」收尾时，会向值勤排班模块原子地追加一条值班处置台账（异常归属随台账保留，
+  归原所属林场）；保存失败时队伍状态与台账一起回退。
 - 想回到初始数据：清掉浏览器里 `forest-fire-patrol:entries` 这一项，或调用 `resetModule(模块)`。

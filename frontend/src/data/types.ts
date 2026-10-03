@@ -18,6 +18,8 @@ export type ModuleMeta = {
   actions: string[]
   actionTargets: Record<string, string>
   metrics: string[]
+  /** 收尾（终态）状态：流转到这些状态后不再计入待办；缺省只认状态列表最后一位 */
+  closedStatuses?: string[]
 }
 
 export type PageResult = {

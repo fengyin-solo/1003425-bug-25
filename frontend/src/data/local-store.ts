@@ -41,11 +41,17 @@ export function listRows(key: string): EntryRow[] {
 }
 
 export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
+  saveModules({ [key]: rows })
+}
+
+// 多模块原子落库：先写 localStorage，成功后才换缓存。
+// 写盘失败时缓存保持原样，收尾页面、工作台和待办读到的都还是操作前的状态。
+export function saveModules(entries: Record<string, EntryRow[]>): void {
+  const next = { ...allRows(), ...entries }
   if (typeof window !== 'undefined' && window.localStorage) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }
+  cache = next
 }
 
 export function resetRows(key: string): EntryRow[] {
